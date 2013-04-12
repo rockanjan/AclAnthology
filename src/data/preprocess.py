@@ -73,7 +73,7 @@ for filename in filelist:
 #save vocab file
 vocab_length = 0
 for k,v in vocab_freq.items():
-	if len(k) and k not in stop_word_list and not re.search('^[0-9]+$', k) and not len(k) == 1 and not (v < 5):
+	if len(k) and k not in stop_word_list and not re.search('^[0-9]+$', k) and not len(k) == 1 and not (v < 10):
 		#fvocab.write('%d %s\n' %(v,k))
 		fvocab.write('%s\n' %k)
 		vocab_length = vocab_length + 1
@@ -84,7 +84,7 @@ logging.info('vocab size : %d' %(vocab_length))
 vocablist = open(VOCAB_FILE).read().splitlines()
 vocab_index = {}
 for index,vocab in enumerate(vocablist):
-	vocab_index[vocab] = index+1
+	vocab_index[vocab] = index
 
 logging.debug('vocab size read : %d' %(len(vocab_index)))
 # prepare a file that can be input to LDA topic model
@@ -102,16 +102,17 @@ for filename in filelist:
 	worddict = {}
 	word_list = get_word_list(fin)
 	for word in word_list:
-		total = total + 1
-		index = 0
+		index = -1
 		if word in vocab_index:
+			total = total + 1
 			index = vocab_index[word]
+			if index in worddict:
+				worddict[index] = worddict[index] + 1
+			else:
+				worddict[index] = 1
 		else:
 			logging.debug('word %s not in vocab' %word)
-		if index in worddict:
-			worddict[index] = worddict[index] + 1
-		else:
-			worddict[index] = 1
+				
 	#write
 	fldaformat.write('%d ' %total)
 	for k,v in worddict.items():
