@@ -1,4 +1,4 @@
-ROOT_FOLDER = '/home/anjan/workspace/AclAnthologyMining/src/'
+ROOT_FOLDER = '/home/anjan/workspace/AclAnthology/src/'
 DATA_FOLDER = '/home/anjan/data/acl_anthology/aan/'
 PAPERS_FOLDER = DATA_FOLDER + 'papers_text/'
 STOP_WORD_FILE = ROOT_FOLDER + "/english.stop.txt"
