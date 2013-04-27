@@ -112,9 +112,9 @@ def count_rows(cur, table):
 	print("%s count = %d" %(table, count[0]))
 	
 def populate_topics(cur):
-	flist = open('/home/anjan/data/acl_anthology/aan/topics/filelist.dat')
-	ftopicprob = open('/home/anjan/data/acl_anthology/aan/topics/topic.exact.prob')
-	ftopicprobout = open('/home/anjan/data/acl_anthology/aan/topics/topic.prob.out', 'wb')
+	flist = open('/home/anjan/workspace/AclAnthology/topics/filelist.dat')
+	ftopicprob = open('/home/anjan/workspace/AclAnthology/topics/topic.exact.prob')
+	ftopicprobout = open('/home/anjan/workspace/AclAnthology/topics/topic.prob.out', 'wb')
 	titles=[]
 	for title in flist:
 		titles.append(re.sub(".txt\n", '', title))
@@ -179,7 +179,7 @@ def populate_authors(cur):
 			hindex = hindex_dict[name]
 		else:
 			hindex = 'NA'
-			print('hindex not available for author : %s' %name)
+			#print('hindex not available for author : %s' %name)
 			na_count = na_count + 1
 		record = (author_id, name, hindex)
 		cur.execute("insert into author values (?, ?, ?)", record)
