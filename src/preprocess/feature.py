@@ -229,13 +229,11 @@ def populate_citation_year(cur):
 		data = papers.fetchall()
 		for row in data:
 			paper_id = row[0]
-			citers = cur.execute('select citer from paper_citation where cited = ?', [paper_id]).fetchall()
-			citer_count = 0
-			for citer in citers:
-				#print('citer: %s', %citer[0])
-				citer_year = cur.execute('select year from paper where id = ?', [citer[0]]).fetchone()
-				if int(citer_year[0]) <= current_year:
-					citer_count = citer_count + 1
+			db_input = [current_year, paper_id]
+			citers = cur.execute('''select citer from paper_citation join paper
+			on paper_citation.citer = paper.id 
+			where paper.year <= ? and cited = ?''', db_input).fetchall()
+			citer_count = len(citers)
 			db_input = [paper_id, str(current_year), str(citer_count)]
 			cur.execute('insert into citation_count_year values (?,?,?)', db_input)
 			fout.write(bytes("\t".join(db_input) + "\n", 'UTF-8'))
