@@ -95,6 +95,7 @@ flist = open(DATA_FOLDER + 'filelist.dat', 'w');
 for filename in filelist:
 	fin = open(filename, 'r')
 	filename = filename.split('/')[-1]
+	
 	if(filename == 'collaboration_network.txt'):
 		continue
 	flist.write(filename + "\n")
