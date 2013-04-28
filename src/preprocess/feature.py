@@ -4,7 +4,8 @@ import re
 from math import log
 
 def removeUnicode(s): 
-	return re.sub(r'[^\x20-\x7e]', 'UNICODE', s)
+	#return re.sub(r'[^\x20-\x7e]', 'UNICODE', s)
+	return re.sub(r'[^\x20-\x7e]', '', s)
 
 def drop_tables(cur):
 	cur.execute('drop table if exists paper')
@@ -49,16 +50,86 @@ def create_tables(cur):
 	
 	
 def create_data_file(cur):
-	fout1_train = open('/home/anjan/workspace/AclAnthology/year1_train.dat')
-	fout1_test = open('/home/anjan/workspace/AclAnthology/year1_test.dat')
-	fout2_train = open('/home/anjan/workspace/AclAnthology/year2_train.dat')
-	fout2_test = open('/home/anjan/workspace/AclAnthology/year2_test.dat')
-	fout5_train = open('/home/anjan/workspace/AclAnthology/year5_train.dat')
-	fout5_test = open('/home/anjan/workspace/AclAnthology/year5_test.dat')
+	print('create data files')
 	duration = [1, 2, 5]
-	rows = cur.execute('select p.id from citation_count_year c join paper p on c.paper = p.id join topic t on p.id = t.id').fetchall()
+	datatype = ['train', 'test']
+	fout = {}
+	
+	venue_filter_pattern = "(\(|\)|\s|:|[0-9]|-|&|#|;|,|\?|\')"
+	#create header for ARFF format
+	header = "@relation 'citation_count'\n"
+	venues = cur.execute('select distinct venue from paper').fetchall()
+	venue_list=[]
+	for venue in venues:
+		venuemod = re.sub(venue_filter_pattern, "", venue[0])
+		venuemod = removeUnicode(venuemod)
+		venue_list.append(venuemod)	
+	venue_list_unique = list(set(venue_list)) #unique
+	
+	print('total venues = %d' %(len(venue_list_unique)))
+	venues = "@attribute venue " + "{" + ", ".join(venue_list_unique) + "}"
+	header = header + venues + "\n"
+	header = header + "@attribute hindex real\n"
+	header = header + "@attribute author_count real\n"
+	topics = "@attribute topic"
+	for i in range(0,100):
+		header = header + topics + str(i) + " real\n"
+	header = header + "@attribute diversity real\n"
+	header = header + "@attribute recency real\n"
+	header = header + "@attribute class real\n"
+	header = header + "@data\n"
+	
+	#print(header)
+	#exit(-1)
+	#open files
+	for year in duration:
+		fout[year] = {}
+		for t in datatype:
+			fout[year][t] = open('/home/anjan/workspace/AclAnthology/year' + str(year) + "_" + t + ".arff", 'wb')
+			fout[year][t].write( bytes(header, 'UTF-8') )
+	
+	debug_file = open('/home/anjan/workspace/AclAnthology/debug_all.dat', 'wb')
+	#debug_file.write( bytes(header, 'UTF-8') )
+	combined_file = open('/home/anjan/workspace/AclAnthology/combined_all.arff', 'wb')
+	combined_file.write( bytes(header, 'UTF-8') ) 
+	rows = cur.execute('''select p.id, p.venue, p.year, p.max_hindex, p.author_count, t.prob, t.diversity, c.published_year, (p.year-c.published_year+1) as recency, c.count 
+	from citation_count_year c join paper p on c.paper = p.id join topic t on p.id = t.id
+	''').fetchall()
+	
+	iter_count = 1;
+	for row in rows:
+		if iter_count % 10000 == 0:
+			print('processing record number : %d' %iter)
+		paperid = row[0]
+		venue = row[1]
+		year = row[2]
+		max_hindex = row[3]
+		author_count = row[4]
+		prob = row[5]
+		diversity = row[6]
+		published_year = row[7]
+		recency = row[8]
+		
+		count = row[9]
+		venue = re.sub(venue_filter_pattern, "", venue)
+		venuemod = removeUnicode(venuemod)
+		debug_write_list = [paperid, venue, str(year), str(max_hindex), str(author_count), "\t".join(prob.split(',')), str(diversity), str(published_year), str(recency), str(count)]		
+		debug_file.write( bytes("\t".join(debug_write_list) + "\n", 'UTF-8'))
+		feature_write_list = [venue, str(max_hindex), str(author_count), "\t".join(prob.split(',')), str(diversity), str(recency), str(count)]
+		combined_file.write(bytes("\t".join(feature_write_list) + "\n", 'UTF-8'))		
+		iter_count = iter_count + 1
+		
+		
+		if iter_count > 100:
+			break
+		
 	
 	
+	debug_file.close()
+	#close files
+	for year in duration:
+		for t in datatype:
+			fout[year][t].close()
 	
 	
 def insert(cur, row):
@@ -275,7 +346,7 @@ def populate_citation_year(cur):
 def main():
 	db = sqlite3.connect('/home/anjan/data/acl_anthology/aan/papers.db')
 	cur = db.cursor()
-	
+	'''
 	drop_tables(cur)
 	create_tables(cur)
 	populate_authors(cur)
@@ -284,8 +355,11 @@ def main():
 	populate_topics(cur)
 	populate_citations(cur)	
 	populate_citation_year(cur) #also creates the data/feature files
-	cur.close()
 	db.commit()
+	'''
+	
+	create_data_file(cur)
+	cur.close()
 	db.close()
 
 	
