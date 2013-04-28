@@ -14,52 +14,60 @@ def drop_tables(cur):
 	cur.execute('drop table if exists citation_count_year')
 	
 def create_tables(cur):
+	
 	cur.execute('''create table paper (
 	id TEXT,
 	title TEXT,
 	venue TEXT,
-	year INTEGER)
-	''')
-	
+	year INTEGER,
+	max_hindex INTEGER,
+	author_count INTEGER
+	)
+	''')	
+	#prob = topic prob distribution
 	cur.execute('''create table topic (
 	id TEXT,
-	topic TEXT,
+	prob TEXT,
 	diversity TEXT)
-	''')
-	
+	''')	
 	cur.execute('''create table author (
 	id TEXT,
 	name TEXT,
 	hindex TEXT)
-	''')
-	
+	''')	
 	cur.execute('''create table paper_citation(
 	citer TEXT,
 	cited TEXT)
-	''')
-	
+	''')	
+	#year = the year paper is considered for counting
 	cur.execute('''create table citation_count_year(
 	paper TEXT,
+	published_year INTEGER,
 	year INTEGER,
 	count INTEGER)
 	''')
 	
-def test(cur):
-	cur.execute("insert into paper values ('testid', 'testtitle', 'testvenue', '1999')")
-	cur.execute("select * from paper")
-	data = cur.fetchone()
-	print(data)
+	
+def create_data_file(cur):
+	fout1_train = open('/home/anjan/workspace/AclAnthology/year1_train.dat')
+	fout1_test = open('/home/anjan/workspace/AclAnthology/year1_test.dat')
+	fout2_train = open('/home/anjan/workspace/AclAnthology/year2_train.dat')
+	fout2_test = open('/home/anjan/workspace/AclAnthology/year2_test.dat')
+	fout5_train = open('/home/anjan/workspace/AclAnthology/year5_train.dat')
+	fout5_test = open('/home/anjan/workspace/AclAnthology/year5_test.dat')
+	duration = [1, 2, 5]
+	rows = cur.execute('select p.id from citation_count_year c join paper p on c.paper = p.id join topic t on p.id = t.id').fetchall()
+	
+	
+	
 	
 def insert(cur, row):
-	record = (row['id'], row['title'], row['venue'], row['year'])
-	cur.execute("insert into paper values (?, ?, ?, ?)", record)
+	record = (row['id'], row['title'], row['venue'], row['year'], row['max_hindex'], row['author_count'])
+	cur.execute("insert into paper values (?, ?, ?, ?, ?, ?)", record)
 	
 def write_to_file(fout, row):
-	#fout.write(bytes(" ".join([row['id'], row['title'],row['venue'],row['year']]), 'UTF-8'))
-	fout.write(bytes("\t".join([row['id'], row['venue'],row['year']]), 'UTF-8'))
-	fout.write(bytes("\n", 'UTF-8'))
-	
-	
+	#fout.write(bytes("\t".join([row['id'], row['venue'], row['year']], row['max_hindex']) + "\n", 'UTF-8'))
+	fout.write(bytes("\t".join([row['id'], row['venue'], str(row['year']), str(row['max_hindex']), str(row['author_count'])]) + "\n", 'UTF-8'))
 	
 def readmeta(cur):
 	'''reads aclmetadata file and populates the records into the table'''
@@ -95,8 +103,28 @@ def readmeta(cur):
 				row['venue'] = value
 			elif key == 'year':
 				row['year'] = value
+			elif key == 'author':
+				authors = value.split(";")
+				author_count = len(authors)
+				if author_count == 0:
+					author_count = 1
+				max_hindex = -1
+				for author in authors:
+					author_hindex = cur.execute('select hindex from author where name = ?', [author]).fetchone()
+					if author_hindex is None:
+						max_hindex = 1 #default
+					else:
+						author_hindex = author_hindex[0]
+						if author_hindex == 'NA':
+							author_hindex = 1 #default value
+						else:
+							author_hindex = int(author_hindex)
+						if author_hindex > max_hindex:
+							max_hindex = author_hindex
+				row['max_hindex'] = max_hindex
+				row['author_count'] = author_count
 			#todo authors
-			if len(row) == 4:
+			if len(row) == 6:
 				complete = 1
 	#if there is no final empty line, final record maynot have been inserted
 	if len(row) != 0 and complete:
@@ -166,7 +194,7 @@ def populate_authors(cur):
 			author_id = splitted[0].strip()
 			name = splitted[1].strip()
 			if name in author_dict:
-				print('author is duplicate %s' %name)
+				#print('author is duplicate %s' %name)
 				duplicate_count = duplicate_count + 1
 			else:
 				author_dict[name] = author_id
@@ -208,34 +236,38 @@ def populate_citation_year(cur):
 	'''populates citation count for paper for each year'''
 	cur.execute('select year from paper')
 	years = cur.fetchall()
-	min = 10000
-	max = -1
+	min_year = 10000
+	max_year = -1
 	print('number of papers : %d' %(len(years)))
 	for year in years:
-		if int(year[0]) < min:
-			min = int(year[0])
-		if int(year[0]) > max:
-			max = int(year[0])
-	print('minyear = %d maxyear = %d' %(min, max))
+		if int(year[0]) < min_year:
+			min_year = int(year[0])
+		if int(year[0]) > max_year:
+			max_year = int(year[0])
+	print('minyear = %d maxyear = %d' %(min_year, max_year))
 	
 	'''for each year, for each paper, 
 	count the number of citations it got upto that year
 	include only the papers published upto that time
 	'''
 	fout = open('/home/anjan/data/acl_anthology/aan/citation_count.txt', 'wb')
-	start_year = max - 3
-	for current_year in range(start_year, max+1):
-		papers = cur.execute('select * from paper where year <= ?', [current_year]);
+	start_year = max_year - 5
+	min_year = 2000 #only consider papers after this year
+	print('Considering papers published only after %d' %min_year)
+	for current_year in range(start_year, max_year+1):
+		print('processing citation count for year : %d' %current_year)
+		papers = cur.execute('select id,year from paper where year <= ? and year >= ?', [current_year, min_year]);
 		data = papers.fetchall()
 		for row in data:
 			paper_id = row[0]
+			published_year = row[1]
 			db_input = [current_year, paper_id]
 			citers = cur.execute('''select citer from paper_citation join paper
 			on paper_citation.citer = paper.id 
 			where paper.year <= ? and cited = ?''', db_input).fetchall()
 			citer_count = len(citers)
-			db_input = [paper_id, str(current_year), str(citer_count)]
-			cur.execute('insert into citation_count_year values (?,?,?)', db_input)
+			db_input = [paper_id, str(published_year), str(current_year), str(citer_count)]
+			cur.execute('insert into citation_count_year values (?,?,?,?)', db_input)
 			fout.write(bytes("\t".join(db_input) + "\n", 'UTF-8'))
 	fout.close()
 					
@@ -246,14 +278,14 @@ def main():
 	
 	drop_tables(cur)
 	create_tables(cur)
+	populate_authors(cur)
 	readmeta(cur)
 	count_rows(cur, 'paper')
 	populate_topics(cur)
-	populate_authors(cur)
-	populate_citations(cur)
-	
-	populate_citation_year(cur)
+	populate_citations(cur)	
+	populate_citation_year(cur) #also creates the data/feature files
 	cur.close()
+	db.commit()
 	db.close()
 
 	
