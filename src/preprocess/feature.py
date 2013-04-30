@@ -114,6 +114,7 @@ def create_data_file(cur):
 	#debug_file.write( bytes(header, 'UTF-8') )
 	combined_file = open('/home/anjan/workspace/AclAnthology/combined_all.arff', 'wb')
 	combined_file.write( bytes(header, 'UTF-8') )
+	combined_csv = open('/home/anjan/workspace/AclAnthology/combined.csv', 'wb')
 	rows = cur.execute('''select p.id, p.venue, p.year, p.max_hindex, p.author_count, t.prob, t.diversity, c.published_year, (c.year-c.published_year+1) as recency,
 	p.max_author_betweenness, p.max_author_closeness, p.max_author_degree, p.max_author_avg_citation,
 	c.count 
@@ -149,7 +150,9 @@ def create_data_file(cur):
 		debug_write_list = [paperid, venuemod, str(year), str(max_hindex), str(author_count), "\t".join(prob.split(',')), str(diversity), str(published_year), str(recency), str(betweenness), str(closeness), str(degree), str(avg_citation), str(count)]		
 		debug_file.write( bytes("\t".join(debug_write_list) + "\n", 'UTF-8'))
 		feature_write_list = [venuemod, str(max_hindex), str(author_count), "\t".join(prob.split(',')), str(diversity), str(recency), str(betweenness), str(closeness), str(degree), str(avg_citation), str(count)]
-		combined_file.write(bytes("\t".join(feature_write_list) + "\n", 'UTF-8'))		
+		combined_file.write(bytes("\t".join(feature_write_list) + "\n", 'UTF-8'))
+		combined_write_list = [str(max_hindex), str(author_count), "\t".join(prob.split(',')), str(diversity), str(recency), str(betweenness), str(closeness), str(degree), str(avg_citation), str(count)]
+		combined_csv.write(bytes("\t".join(combined_write_list) + "\n", 'UTF-8'))
 		iter_count = iter_count + 1
 		'''
 		if iter_count > 10000:
@@ -157,6 +160,8 @@ def create_data_file(cur):
 		'''
 	
 	debug_file.close()
+	combined_file.close()
+	combined_csv.close()
 	#close files
 	for year in duration:
 		for t in datatype:
@@ -539,7 +544,7 @@ def populate_citation_year(cur):
 def main():
 	db = sqlite3.connect('/home/anjan/data/acl_anthology/aan/papers.db')
 	cur = db.cursor()
-	
+	'''
 	drop_tables(cur)
 	create_tables(cur)
 	populate_authors(cur)
@@ -549,8 +554,7 @@ def main():
 	populate_citations(cur)	
 	populate_citation_year(cur) #also creates the data/feature files
 	db.commit()
-	
-	
+	'''
 	create_data_file(cur)
 	cur.close()
 	db.close()
